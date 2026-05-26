@@ -36,8 +36,7 @@ export default function JarvisPage() {
   const [voiceMode, setVoiceMode] = useState(true);
   const [textInput, setTextInput] = useState("");
   const [ttsEnabled, setTtsEnabled] = useState(true);
-  const [rate, setRate] = useState(0.9);
-  const [pitch, setPitch] = useState(0.85);
+  const [conversationMode, setConversationMode] = useState(false);
   const [clock, setClock] = useState("");
   const [activeTool, setActiveTool] = useState(null);
   const [msgCount, setMsgCount] = useState(0);
@@ -48,8 +47,16 @@ export default function JarvisPage() {
   const historyEndRef = useRef(null);
   const animFrameRef = useRef(null);
   const waveIntervalRef = useRef(null);
+  const sendMessageRef = useRef(null);
+  const autoListenRef = useRef(false);
+  const conversationModeRef = useRef(false);
+  const currentAudioRef = useRef(null);
 
-  // Clock
+  useEffect(() => {
+    conversationModeRef.current = conversationMode;
+    recognitionRef.current = null;
+  }, [conversationMode]);
+
   useEffect(() => {
     const tick = () => setClock(new Date().toTimeString().slice(0, 8));
     tick();
@@ -57,7 +64,6 @@ export default function JarvisPage() {
     return () => clearInterval(id);
   }, []);
 
-  // Reactor rotation
   useEffect(() => {
     let angle = 0;
     const animate = () => {
@@ -69,7 +75,6 @@ export default function JarvisPage() {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, []);
 
-  // Waveform
   useEffect(() => {
     if (isListening) {
       waveIntervalRef.current = setInterval(() => {
@@ -82,47 +87,134 @@ export default function JarvisPage() {
     return () => clearInterval(waveIntervalRef.current);
   }, [isListening]);
 
-  // Auto-scroll history
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history]);
 
-  // Speech recognition setup
   const setupRecognition = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return null;
     const r = new SR();
-    r.continuous = false;
+    r.continuous = conversationModeRef.current;
     r.interimResults = true;
     r.lang = "en-US";
 
-    r.onstart = () => { setIsListening(true); setStatus("LISTENING"); };
+    let accumulated = "";
+    let silenceTimer = null;
+
+    r.onstart = () => { setIsListening(true); setStatus("LISTENING"); accumulated = ""; };
+
     r.onresult = (evt) => {
-      let interim = "", final = "";
+      let final = "", interim = "";
       for (let i = evt.resultIndex; i < evt.results.length; i++) {
         const t = evt.results[i][0].transcript;
         if (evt.results[i].isFinal) final += t;
         else interim += t;
       }
-      setHeardText(final || interim);
-      if (final) r._final = final;
+      accumulated += final;
+      setHeardText(accumulated + interim);
+
+      if (conversationModeRef.current && (final || interim)) {
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          if (accumulated.trim()) r.stop();
+        }, 1800);
+      }
+      if (!conversationModeRef.current && final) r._final = (r._final || "") + final;
     };
+
     r.onend = () => {
       setIsListening(false);
-      const t = r._final;
-      r._final = "";
-      if (t) sendMessage(t);
+      clearTimeout(silenceTimer);
+      const text = conversationModeRef.current
+        ? accumulated.trim()
+        : (r._final || "").trim();
+      if (!conversationModeRef.current) r._final = "";
+      accumulated = "";
+      if (text) sendMessageRef.current?.(text);
     };
+
     r.onerror = (e) => {
       setIsListening(false);
+      clearTimeout(silenceTimer);
+      accumulated = "";
       if (e.error !== "no-speech") setHeardText(`Error: ${e.error}`);
     };
     return r;
   }, []); // eslint-disable-line
 
-  // Send message to API
+  const startListening = useCallback(() => {
+    if (!recognitionRef.current) recognitionRef.current = setupRecognition();
+    try { recognitionRef.current?.start(); } catch (_) {}
+  }, [setupRecognition]);
+
+  function stopSpeaking() {
+    autoListenRef.current = false;
+    if (currentAudioRef.current) {
+      currentAudioRef.current.onended = null;
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    if (window.speechSynthesis?.speaking) window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  }
+
+  function speakBrowser(clean, onEnd) {
+    if (!window.speechSynthesis) { onEnd?.(); return; }
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.rate = 0.88; utt.pitch = 0.82; utt.volume = 1;
+    const voices = window.speechSynthesis.getVoices();
+    const v = voices.find(v => v.name.includes("Daniel") || v.name.includes("Google UK English Male"))
+      || voices.find(v => v.lang === "en-GB")
+      || voices.find(v => v.lang.startsWith("en"));
+    if (v) utt.voice = v;
+    utt.onstart = () => setIsSpeaking(true);
+    utt.onend = () => { setIsSpeaking(false); onEnd?.(); };
+    window.speechSynthesis.speak(utt);
+  }
+
+  async function speak(text) {
+    const clean = text.replace(/#{1,6}\s/g,"").replace(/\*\*/g,"").replace(/\*/g,"").replace(/`/g,"").trim();
+    const onEnd = () => {
+      if (autoListenRef.current) {
+        autoListenRef.current = false;
+        setTimeout(() => startListening(), 400);
+      }
+    };
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        currentAudioRef.current = audio;
+        setIsSpeaking(true);
+        audio.onended = () => {
+          currentAudioRef.current = null;
+          setIsSpeaking(false);
+          URL.revokeObjectURL(url);
+          onEnd();
+        };
+        audio.onerror = () => {
+          currentAudioRef.current = null;
+          setIsSpeaking(false);
+          URL.revokeObjectURL(url);
+          speakBrowser(clean, onEnd);
+        };
+        await audio.play();
+        return;
+      }
+    } catch (_) {}
+    speakBrowser(clean, onEnd);
+  }
+
   const sendMessage = useCallback(async (text) => {
-    if (!text.trim() || isThinking) return;
+    if (!text?.trim() || isThinking) return;
     setIsThinking(true);
     setStatus("THINKING");
     setResponseText("");
@@ -154,21 +246,27 @@ export default function JarvisPage() {
           if (!line.startsWith("data: ")) continue;
           const json = JSON.parse(line.slice(6));
 
-          if (json.type === "text") {
+          if (json.type === "chunk") {
             fullText += json.text;
             setResponseText(fullText);
-          }
-          if (json.type === "tool") {
-            setActiveTool(TOOL_LABELS[json.name] || json.name.toUpperCase());
-            setStatus("EXECUTING");
           }
           if (json.type === "done") {
             setActiveTool(null);
             setIsThinking(false);
             setMsgCount(c => c + 1);
             setStatus("STANDBY");
-            setHistory(prev => [...prev, { who: "JARVIS", msg: json.text || fullText }]);
-            if (ttsEnabled) speak(json.text || fullText, rate, pitch);
+            const finalText = json.text || fullText;
+            setResponseText(finalText);
+            setHistory(prev => [...prev, { who: "JARVIS", msg: finalText }]);
+            if (ttsEnabled) {
+              if (conversationModeRef.current) autoListenRef.current = true;
+              speak(finalText);
+            } else if (conversationModeRef.current) {
+              setTimeout(() => startListening(), 500);
+            }
+          }
+          if (json.type === "thinking") {
+            setStatus("PROCESSING...");
           }
           if (json.type === "error") {
             setResponseText(`Error: ${json.message}`);
@@ -182,31 +280,22 @@ export default function JarvisPage() {
       setIsThinking(false);
       setStatus("ERROR");
     }
-  }, [isThinking, ttsEnabled, rate, pitch]);
+  }, [isThinking, ttsEnabled, startListening]);
 
-  function speak(text, r, p) {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const clean = text.replace(/#{1,6}\s/g,"").replace(/\*\*/g,"").replace(/\*/g,"").replace(/`/g,"").trim();
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate = r; utt.pitch = p; utt.volume = 1;
-    const voices = window.speechSynthesis.getVoices();
-    const v = voices.find(v => v.name.includes("Daniel") || v.name.includes("Google UK English Male"))
-      || voices.find(v => v.lang === "en-GB")
-      || voices.find(v => v.lang.startsWith("en"));
-    if (v) utt.voice = v;
-    utt.onstart = () => setIsSpeaking(true);
-    utt.onend = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utt);
-  }
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
 
   function handleReactorClick() {
-    if (!voiceMode || isThinking) return;
+    if (!voiceMode) return;
+    if (isSpeaking) {
+      stopSpeaking();
+      setTimeout(() => startListening(), 100);
+      return;
+    }
+    if (isThinking) return;
     if (isListening) {
       recognitionRef.current?.stop();
     } else {
-      if (!recognitionRef.current) recognitionRef.current = setupRecognition();
-      try { recognitionRef.current?.start(); } catch (_) {}
+      startListening();
     }
   }
 
@@ -215,7 +304,7 @@ export default function JarvisPage() {
     setHistory([]);
     setMsgCount(0);
     setResponseText("Session reset. Ready when you are, sir.");
-    if (ttsEnabled) speak("Session reset. Ready when you are, sir.", rate, pitch);
+    if (ttsEnabled) speak("Session reset. Ready when you are, sir.");
   }
 
   function handleSendText() {
@@ -223,31 +312,32 @@ export default function JarvisPage() {
     if (t) { sendMessage(t); setTextInput(""); }
   }
 
-  // Spacebar PTT
   useEffect(() => {
     const down = (e) => {
-      if (e.code === "Space" && voiceMode && !isThinking && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "INPUT") {
+      if (e.code === "Space" && voiceMode && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "INPUT") {
         e.preventDefault();
-        if (!isListening) {
-          if (!recognitionRef.current) recognitionRef.current = setupRecognition();
-          try { recognitionRef.current?.start(); } catch (_) {}
+        if (isSpeaking) {
+          stopSpeaking();
+          setTimeout(() => startListening(), 100);
+        } else if (!isThinking && !isListening) {
+          startListening();
         }
       }
     };
     const up = (e) => {
-      if (e.code === "Space" && isListening) recognitionRef.current?.stop();
+      if (e.code === "Space" && isListening && !conversationMode) recognitionRef.current?.stop();
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
-  }, [voiceMode, isThinking, isListening, setupRecognition]);
+  }, [voiceMode, isThinking, isListening, isSpeaking, conversationMode, startListening]);
 
   const reactorState = isListening ? "listening" : isThinking ? "thinking" : isSpeaking ? "speaking" : "idle";
+  const reactorLabel = isListening ? "LISTENING..." : isThinking ? (activeTool || "PROCESSING...") : isSpeaking ? "TAP TO INTERRUPT" : conversationMode ? "AUTO-LISTEN ON" : "CLICK TO SPEAK";
 
   return (
     <div className={styles.app}>
 
-      {/* Top bar */}
       <div className={styles.topbar}>
         <div className={styles.topbarLeft}>
           <span className={styles.label}>SYSTEM</span>
@@ -260,10 +350,8 @@ export default function JarvisPage() {
         </div>
       </div>
 
-      {/* Main HUD */}
       <div className={styles.mainHud}>
 
-        {/* Left panel */}
         <div className={styles.sidePanel}>
           <div className={styles.panelBlock}>
             <div className={styles.panelLabel}>CAPABILITIES</div>
@@ -283,7 +371,6 @@ export default function JarvisPage() {
           </div>
         </div>
 
-        {/* Center */}
         <div className={styles.centerHud}>
           <div className={styles.reactorWrap} onClick={handleReactorClick}>
             <svg viewBox="0 0 300 300" className={`${styles.reactorSvg} ${styles[reactorState]}`}>
@@ -303,30 +390,23 @@ export default function JarvisPage() {
               <polyline points="290,10 290,30 270,30" fill="none" stroke="#00d4ff" strokeWidth="1.5" opacity="0.5"/>
               <polyline points="10,290 10,270 30,270" fill="none" stroke="#00d4ff" strokeWidth="1.5" opacity="0.5"/>
               <polyline points="290,290 290,270 270,270" fill="none" stroke="#00d4ff" strokeWidth="1.5" opacity="0.5"/>
-
-              {/* Mic icon */}
               <g transform="translate(150,150)" opacity={isListening ? 0 : 1} style={{ transition: "opacity 0.3s" }}>
                 <rect x="-7" y="-16" width="14" height="22" rx="7" fill="none" stroke="#00d4ff" strokeWidth="2"/>
                 <path d="M-12,0 Q-12,14 0,14 Q12,14 12,0" fill="none" stroke="#00d4ff" strokeWidth="2"/>
                 <line x1="0" y1="14" x2="0" y2="20" stroke="#00d4ff" strokeWidth="2"/>
                 <line x1="-6" y1="20" x2="6" y2="20" stroke="#00d4ff" strokeWidth="2"/>
               </g>
-
-              {/* Waveform */}
               <g transform="translate(150,150)" opacity={isListening ? 1 : 0} style={{ transition: "opacity 0.3s" }}>
                 {waveHeights.map((h, i) => (
                   <rect key={i} x={-30 + i*12} y={-h/2} width="8" height={h} rx="2" fill="#00d4ff"/>
                 ))}
               </g>
             </svg>
-            <div className={styles.reactorLabel}>
-              {isListening ? "LISTENING..." : isThinking ? (activeTool || "PROCESSING...") : "CLICK TO SPEAK"}
-            </div>
+            <div className={styles.reactorLabel}>{reactorLabel}</div>
           </div>
-          <div className={styles.heardText}>{heardText || " "}</div>
+          <div className={styles.heardText}>{heardText || " "}</div>
         </div>
 
-        {/* Right panel */}
         <div className={styles.sidePanel}>
           <div className={styles.panelBlock}>
             <div className={styles.panelLabel}>INPUT MODE</div>
@@ -334,6 +414,31 @@ export default function JarvisPage() {
               <button className={`${styles.modeBtn} ${voiceMode ? styles.modeBtnActive : ""}`} onClick={() => setVoiceMode(true)}>VOICE</button>
               <button className={`${styles.modeBtn} ${!voiceMode ? styles.modeBtnActive : ""}`} onClick={() => setVoiceMode(false)}>TEXT</button>
             </div>
+            {voiceMode && (
+              <div style={{marginTop:10}}>
+                <div className={styles.panelLabel}>CONVERSATION</div>
+                <div className={styles.toggleRow}>
+                  <span style={{fontSize:"0.65rem"}}>AUTO-LISTEN</span>
+                  <label className={styles.toggle}>
+                    <input type="checkbox" checked={conversationMode} onChange={e => setConversationMode(e.target.checked)}/>
+                    <span className={styles.slider}/>
+                  </label>
+                </div>
+                {conversationMode && (
+                  <div style={{marginTop:8}}>
+                    <button
+                      className={styles.hudBtn}
+                      onClick={() => { if (!isListening && !isThinking && !isSpeaking) startListening(); }}
+                    >
+                      {isListening ? "LISTENING..." : isSpeaking ? "JARVIS SPEAKING" : "START TALKING"}
+                    </button>
+                    <div style={{fontSize:"0.58rem", opacity:0.5, marginTop:6, letterSpacing:"0.08em", textAlign:"center"}}>
+                      SPEAK NATURALLY · PAUSES AUTO-SEND
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {!voiceMode && (
               <div>
                 <textarea
@@ -357,16 +462,12 @@ export default function JarvisPage() {
                 <span className={styles.slider}/>
               </label>
             </div>
-            <div className={styles.panelLabel} style={{marginTop:12}}>RATE</div>
-            <input type="range" min="0.5" max="1.5" step="0.05" value={rate} onChange={e => setRate(+e.target.value)} className={styles.hudSlider}/>
-            <div className={styles.panelLabel} style={{marginTop:8}}>PITCH</div>
-            <input type="range" min="0.5" max="1.5" step="0.05" value={pitch} onChange={e => setPitch(+e.target.value)} className={styles.hudSlider}/>
+            <div className={styles.panelValue} style={{marginTop:12, fontSize:"0.65rem", opacity:0.7, letterSpacing:"0.1em"}}>ELEVENLABS · BRITISH MALE</div>
           </div>
         </div>
 
       </div>
 
-      {/* Response */}
       <div className={styles.responseArea}>
         <div className={styles.responseLabel}>RESPONSE</div>
         <div className={`${styles.responseText} ${isThinking && !responseText ? styles.blinking : ""}`}>
@@ -374,7 +475,6 @@ export default function JarvisPage() {
         </div>
       </div>
 
-      {/* History */}
       <div className={styles.historyArea}>
         <div className={styles.historyLabel}>INTERACTION LOG</div>
         <div className={styles.historyLog}>

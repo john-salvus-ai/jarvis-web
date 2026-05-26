@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 
 const CLAUDE_BIN = process.env.CLAUDE_BIN || "/usr/bin/claude";
-const MCP_CONFIG = "/home/claude/.config/claude-code/mcp.json";
+const MCP_CONFIG = "/home/claude/.config/claude-code/mcp-web.json";
 const WORK_DIR = process.env.JARVIS_WORK_DIR || "/home/claude/jarvis-workspace";
 const LOCAL_URL = process.env.JARVIS_LOCAL_URL || "http://5.78.220.133:3131";
 
@@ -161,12 +161,15 @@ export async function POST(req) {
 
       send({ type: "thinking" });
 
+      const hasSession = fs.existsSync(path.join(WORK_DIR, ".claude"));
+
       spawnClaude(
         message,
-        true,
+        hasSession,
         (chunk) => send({ type: "chunk", text: chunk }),
         (code, stdout, stderr) => {
-          if (code !== 0 && !stdout.trim()) {
+          if (code !== 0 && !stdout.trim() && hasSession) {
+            // Session existed but was stale — retry fresh
             spawnClaude(
               message,
               false,

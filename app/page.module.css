@@ -1,3 +1,4 @@
+/* ── GLOBALS ────────────────────────────────────────────── */
 .app {
   position: relative; z-index: 1;
   width: 100vw; height: 100vh;
@@ -6,13 +7,12 @@
   overflow: hidden;
 }
 
-/* TOP BAR */
+/* ── TOP BAR ────────────────────────────────────────────── */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  height: 48px;
+  height: 48px; flex-shrink: 0;
   border-bottom: 1px solid #0077aa;
   padding: 0 8px;
-  flex-shrink: 0;
 }
 .topbarLeft, .topbarRight {
   display: flex; align-items: center; gap: 8px; min-width: 180px;
@@ -27,17 +27,17 @@
 .label { font-size: 9px; letter-spacing: 3px; color: #5580aa; }
 .value { font-size: 11px; letter-spacing: 2px; color: #00d4ff; font-family: 'Share Tech Mono', monospace; }
 .value[data-state="listening"] { color: #00ff88; }
-.value[data-state="thinking"] { color: #ffaa00; }
-.value[data-state="speaking"] { color: #aa88ff; }
+.value[data-state="thinking"]  { color: #ffaa00; }
+.value[data-state="speaking"]  { color: #aa88ff; }
 
-/* MAIN HUD */
+/* ── MAIN HUD (desktop 3-column) ───────────────────────── */
 .mainHud {
   display: flex; align-items: center; justify-content: space-between;
   flex: 0 0 auto;
   padding: 8px 0; gap: 16px;
 }
 
-/* SIDE PANELS */
+/* ── SIDE PANELS ────────────────────────────────────────── */
 .sidePanel {
   width: 200px; flex-shrink: 0;
   display: flex; flex-direction: column; gap: 12px;
@@ -52,18 +52,17 @@
   content: '';
   position: absolute; top: -1px; left: 10px;
   width: 40px; height: 2px;
-  background: #00d4ff;
-  box-shadow: 0 0 8px #00d4ff;
+  background: #00d4ff; box-shadow: 0 0 8px #00d4ff;
 }
-.panelLabel { font-size: 8px; letter-spacing: 3px; color: #5580aa; margin-bottom: 8px; }
-.panelValue { font-size: 11px; color: #00d4ff; font-family: 'Share Tech Mono', monospace; }
+.panelLabel  { font-size: 8px; letter-spacing: 3px; color: #5580aa; margin-bottom: 8px; }
+.panelValue  { font-size: 11px; color: #00d4ff; font-family: 'Share Tech Mono', monospace; }
 
 .capList { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; max-height: 200px; }
 .capList::-webkit-scrollbar { width: 3px; }
 .capList::-webkit-scrollbar-thumb { background: #0077aa; border-radius: 2px; }
-.capItem { display: flex; align-items: center; gap: 8px; font-size: 8px; letter-spacing: 1px; color: #5580aa; flex-shrink: 0; }
+.capItem  { display: flex; align-items: center; gap: 8px; font-size: 8px; letter-spacing: 1px; color: #5580aa; flex-shrink: 0; }
 .capActive { color: #00d4ff; }
-.capDot { width: 6px; height: 6px; border-radius: 50%; background: #0d3888; flex-shrink: 0; transition: all 0.3s; }
+.capDot   { width: 6px; height: 6px; border-radius: 50%; background: #0d3888; flex-shrink: 0; transition: all 0.3s; }
 .capActive .capDot { background: #00d4ff; box-shadow: 0 0 6px #00d4ff; }
 
 .hudBtn {
@@ -90,6 +89,7 @@
   border: 1px solid #0077aa; color: #c8e8ff;
   font-family: 'Share Tech Mono', monospace; font-size: 11px;
   padding: 6px; resize: none; outline: none; margin-top: 6px;
+  box-sizing: border-box;
 }
 .textInput:focus { border-color: #00d4ff; }
 
@@ -101,7 +101,7 @@
 .toggle input:checked + .slider { background: rgba(0,212,255,0.15); border-color: #00d4ff; }
 .toggle input:checked + .slider::before { background: #00d4ff; box-shadow: 0 0 6px #00d4ff; transform: translateX(18px); }
 
-/* CENTER */
+/* ── CENTER ─────────────────────────────────────────────── */
 .centerHud { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .reactorWrap { display: flex; flex-direction: column; align-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .reactorSvg {
@@ -110,12 +110,15 @@
   transition: filter 0.3s;
 }
 .reactorSvg.listening { filter: drop-shadow(0 0 30px rgba(0,255,136,0.7)); }
-.reactorSvg.thinking { filter: drop-shadow(0 0 20px rgba(255,170,0,0.6)); }
-.reactorSvg.speaking { filter: drop-shadow(0 0 20px rgba(170,136,255,0.6)); }
+.reactorSvg.thinking  { filter: drop-shadow(0 0 20px rgba(255,170,0,0.6)); }
+.reactorSvg.speaking  { filter: drop-shadow(0 0 20px rgba(170,136,255,0.6)); }
 .reactorLabel { font-size: 9px; letter-spacing: 3px; color: #5580aa; text-align: center; margin-top: 4px; }
-.heardText { font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1px; color: #5580aa; text-align: center; min-height: 16px; max-width: 300px; font-style: italic; }
+.heardText {
+  font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1px;
+  color: #5580aa; text-align: center; min-height: 16px; max-width: 300px; font-style: italic;
+}
 
-/* RESPONSE */
+/* ── RESPONSE ───────────────────────────────────────────── */
 .responseArea {
   border: 1px solid #0077aa; background: rgba(0,15,30,0.7);
   padding: 10px 14px; flex-shrink: 0; position: relative;
@@ -130,7 +133,7 @@
 .blinking::after { content: ''; display: inline-block; width: 8px; height: 12px; background: #00d4ff; animation: blink 0.8s step-end infinite; margin-left: 2px; vertical-align: middle; }
 @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
 
-/* HISTORY */
+/* ── HISTORY ────────────────────────────────────────────── */
 .historyArea {
   border: 1px solid #0077aa; background: rgba(0,10,20,0.5);
   padding: 8px 14px; flex: 1; min-height: 0; overflow: hidden;
@@ -142,57 +145,83 @@
 .historyLog::-webkit-scrollbar { width: 4px; }
 .historyLog::-webkit-scrollbar-thumb { background: #0077aa; border-radius: 2px; }
 .historyEntry { display: flex; gap: 8px; align-items: flex-start; opacity: 0.6; border-bottom: 1px solid rgba(0,100,150,0.15); padding-bottom: 5px; }
-.userEntry { opacity: 0.5; }
+.userEntry  { opacity: 0.5; }
 .who { font-size: 8px; letter-spacing: 2px; flex-shrink: 0; padding-top: 1px; }
-.userEntry .who { color: #5580aa; }
+.userEntry .who  { color: #5580aa; }
 .jarvisEntry .who { color: #0077aa; }
 .histMsg { color: #c8e8ff; line-height: 1.4; font-size: 11px; }
 
-/* ── MOBILE ── */
+/* ── MOBILE ─────────────────────────────────────────────── */
 @media (max-width: 700px) {
-  .app { padding: 0 10px 10px; height: 100dvh; }
+  .app {
+    padding: 0 10px 8px;
+    height: 100dvh;
+  }
 
   /* Compact top bar */
-  .topbar { height: 40px; padding: 0 4px; }
-  .topbarLeft, .topbarRight { min-width: 60px; gap: 4px; }
-  .topbarCenter { font-size: 13px; letter-spacing: 4px; }
+  .topbar { height: 42px; padding: 0 4px; }
+  .topbarLeft, .topbarRight { min-width: auto; gap: 5px; }
+  .topbarCenter { font-size: 13px; letter-spacing: 3px; }
 
-  /* Stack hud vertically, center everything */
-  .mainHud {
+  /*
+   * Key trick: display:contents makes .mainHud invisible to the flex
+   * layout, so its children (leftPanel, centerHud, rightPanel) become
+   * direct children of .app and we can reorder them freely.
+   */
+  .mainHud { display: contents; }
+
+  /* Hide the capabilities / session panel */
+  .leftPanel { display: none !important; }
+
+  /* Reactor block — sits right below the top bar */
+  .centerHud {
+    order: 2;
+    flex: 0 0 auto;
+    display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 4px 0;
-    gap: 8px;
+    gap: 4px;
+    padding: 6px 0 0;
   }
 
-  /* Hide capabilities panel */
-  .leftPanel { display: none; }
-
-  /* Right panel goes full-width horizontal below reactor */
-  .rightPanel {
-    width: 100%;
-    flex-direction: row;
-    gap: 8px;
+  /* Responsive reactor: 62% of viewport width, capped at 240px */
+  .reactorSvg {
+    width: min(62vw, 240px) !important;
+    height: min(62vw, 240px) !important;
   }
-  .rightPanel .panelBlock { flex: 1; padding: 8px 10px; }
-  .rightPanel .panelBlock::before { display: none; }
 
-  /* Smaller reactor */
-  .reactorSvg { width: 190px; height: 190px; }
-  .centerHud { gap: 4px; }
-  .heardText { font-size: 10px; max-width: 260px; }
-  .reactorLabel { font-size: 8px; letter-spacing: 2px; }
+  .reactorLabel { font-size: 9px; letter-spacing: 2px; }
+  .heardText { font-size: 10px; max-width: 85vw; }
 
-  /* Response takes more vertical space, scrollable */
-  .responseArea { flex: 1; min-height: 0; overflow-y: auto; }
+  /* Response scrolls and fills remaining vertical space */
+  .responseArea {
+    order: 3;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
   .responseText { font-size: 14px; min-height: 20px; }
 
-  /* Compact history */
-  .historyArea { max-height: 100px; flex: 0 0 auto; }
-  .historyLabel { display: none; }
-  .histMsg { font-size: 10px; }
+  /* Compact bottom controls strip */
+  .rightPanel {
+    order: 4;
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100%;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .rightPanel .panelBlock {
+    flex: 1;
+    padding: 8px 10px;
+  }
+  .rightPanel .panelBlock::before { display: none; }
+  .rightPanel .panelLabel { margin-bottom: 4px; font-size: 7px; }
+
+  /* No history on mobile — keep UX clean */
+  .historyArea { display: none; }
 
   /* Bigger tap targets */
-  .hudBtn { padding: 8px; font-size: 9px; }
-  .modeBtn { padding: 8px 4px; font-size: 9px; }
+  .hudBtn { padding: 9px 8px; font-size: 9px; margin-top: 6px; }
+  .modeBtn { padding: 9px 4px; }
 }

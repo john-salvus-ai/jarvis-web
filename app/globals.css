@@ -20,6 +20,9 @@ html, body {
   color: var(--text);
   font-family: 'Orbitron', sans-serif;
   overflow: hidden;
+  /* Prevent iOS bounce scroll */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Scanlines */

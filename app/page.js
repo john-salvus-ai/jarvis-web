@@ -2,19 +2,34 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import styles from "./page.module.css";
 
-const TOOL_LABELS = {
-  web_search: "SEARCHING WEB",
-  scrape_url: "SCRAPING URL",
-  stripe_balance: "FETCHING STRIPE",
-  stripe_revenue: "FETCHING REVENUE",
-};
+const CAPABILITIES = [
+  ["web",       "WEB SEARCH"],
+  ["scrape",    "WEB SCRAPE"],
+  ["github",    "GITHUB"],
+  ["stripe",    "STRIPE"],
+  ["supabase",  "SUPABASE"],
+  ["spotify",   "SPOTIFY"],
+  ["gmail",     "GMAIL"],
+  ["calendar",  "CALENDAR"],
+  ["quickbooks","QUICKBOOKS"],
+  ["shopify",   "SHOPIFY"],
+  ["hubspot",   "HUBSPOT"],
+  ["clickup",   "CLICKUP"],
+  ["atlassian", "JIRA / CONFLUENCE"],
+  ["datadog",   "DATADOG"],
+  ["sentry",    "SENTRY"],
+  ["figma",     "FIGMA"],
+  ["vercel",    "VERCEL"],
+  ["klaviyo",   "KLAVIYO"],
+  ["memory",    "MEMORY"],
+  ["files",     "FILESYSTEM"],
+];
 
 export default function JarvisPage() {
   const [status, setStatus] = useState("STANDBY");
   const [responseText, setResponseText] = useState("Good day, sir. All systems operational. How may I assist you?");
   const [heardText, setHeardText] = useState("");
   const [history, setHistory] = useState([]);
-  const [conversationHistory, setConversationHistory] = useState([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -114,8 +129,6 @@ export default function JarvisPage() {
     setHeardText("");
     setActiveTool(null);
 
-    const newHistory = [...conversationHistory, { role: "user", content: text }];
-    setConversationHistory(newHistory);
     setHistory(prev => [...prev, { who: "YOU", msg: text }]);
 
     let fullText = "";
@@ -123,7 +136,7 @@ export default function JarvisPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: conversationHistory }),
+        body: JSON.stringify({ message: text }),
       });
 
       const reader = res.body.getReader();
@@ -154,7 +167,6 @@ export default function JarvisPage() {
             setIsThinking(false);
             setMsgCount(c => c + 1);
             setStatus("STANDBY");
-            setConversationHistory(prev => [...prev, { role: "assistant", content: json.text || fullText }]);
             setHistory(prev => [...prev, { who: "JARVIS", msg: json.text || fullText }]);
             if (ttsEnabled) speak(json.text || fullText, rate, pitch);
           }
@@ -170,7 +182,7 @@ export default function JarvisPage() {
       setIsThinking(false);
       setStatus("ERROR");
     }
-  }, [isThinking, conversationHistory, ttsEnabled, rate, pitch]);
+  }, [isThinking, ttsEnabled, rate, pitch]);
 
   function speak(text, r, p) {
     if (!window.speechSynthesis) return;
@@ -198,8 +210,8 @@ export default function JarvisPage() {
     }
   }
 
-  function handleReset() {
-    setConversationHistory([]);
+  async function handleReset() {
+    await fetch("/api/reset", { method: "POST" }).catch(() => {});
     setHistory([]);
     setMsgCount(0);
     setResponseText("Session reset. Ready when you are, sir.");
@@ -256,7 +268,7 @@ export default function JarvisPage() {
           <div className={styles.panelBlock}>
             <div className={styles.panelLabel}>CAPABILITIES</div>
             <div className={styles.capList}>
-              {[["web","WEB SEARCH"],["scrape","WEB SCRAPE"],["stripe","STRIPE"],["memory","MEMORY"]].map(([k,l]) => (
+              {CAPABILITIES.map(([k,l]) => (
                 <div key={k} className={`${styles.capItem} ${activeTool ? styles.capActive : ""}`}>
                   <div className={styles.capDot} />
                   <span>{l}</span>

@@ -57,8 +57,10 @@
 .panelLabel { font-size: 8px; letter-spacing: 3px; color: #5580aa; margin-bottom: 8px; }
 .panelValue { font-size: 11px; color: #00d4ff; font-family: 'Share Tech Mono', monospace; }
 
-.capList { display: flex; flex-direction: column; gap: 5px; }
-.capItem { display: flex; align-items: center; gap: 8px; font-size: 9px; letter-spacing: 2px; color: #5580aa; }
+.capList { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; max-height: 200px; }
+.capList::-webkit-scrollbar { width: 3px; }
+.capList::-webkit-scrollbar-thumb { background: #0077aa; border-radius: 2px; }
+.capItem { display: flex; align-items: center; gap: 8px; font-size: 8px; letter-spacing: 1px; color: #5580aa; flex-shrink: 0; }
 .capActive { color: #00d4ff; }
 .capDot { width: 6px; height: 6px; border-radius: 50%; background: #0d3888; flex-shrink: 0; transition: all 0.3s; }
 .capActive .capDot { background: #00d4ff; box-shadow: 0 0 6px #00d4ff; }

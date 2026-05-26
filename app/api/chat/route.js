@@ -5,8 +5,13 @@ import fs from "fs";
 const CLAUDE_BIN = process.env.CLAUDE_BIN || "/usr/bin/claude";
 const MCP_CONFIG = "/home/claude/.config/claude-code/mcp.json";
 const WORK_DIR = process.env.JARVIS_WORK_DIR || "/home/claude/jarvis-workspace";
+const LOCAL_URL = process.env.JARVIS_LOCAL_URL || "http://5.78.220.133:3131";
 
-const JARVIS_PERSONA = `# Jarvis — AI assistant for John McIntosh
+// Only runs on the local server where the filesystem is writable
+const HAS_CLI = fs.existsSync(CLAUDE_BIN);
+
+if (HAS_CLI) {
+  const JARVIS_PERSONA = `# Jarvis — AI assistant for John McIntosh
 
 You are Jarvis, the personal AI assistant of John McIntosh, founder of Salvus AI, LiveRounded Health, Onicx, SolSmile Lounge, Wiener World, The AI Council, AbleNet, and a Restaurant AI Demo. John is based in Tampa, Florida.
 
@@ -49,12 +54,11 @@ You have access to all of the following — use them freely without being asked:
 - Amplitude: product analytics
 - Puppeteer: browser automation
 `;
-
-// Ensure workspace exists with Jarvis persona
-fs.mkdirSync(WORK_DIR, { recursive: true });
-const PERSONA_FILE = path.join(WORK_DIR, "CLAUDE.md");
-if (!fs.existsSync(PERSONA_FILE)) {
-  fs.writeFileSync(PERSONA_FILE, JARVIS_PERSONA);
+  fs.mkdirSync(WORK_DIR, { recursive: true });
+  const PERSONA_FILE = path.join(WORK_DIR, "CLAUDE.md");
+  if (!fs.existsSync(PERSONA_FILE)) {
+    fs.writeFileSync(PERSONA_FILE, JARVIS_PERSONA);
+  }
 }
 
 function spawnClaude(message, resume, onChunk, onDone) {
@@ -86,6 +90,47 @@ function spawnClaude(message, resume, onChunk, onDone) {
   return proc;
 }
 
+// Proxy SSE stream from the local server to the Vercel client
+async function proxyToLocal(message, controller, encoder) {
+  const send = (obj) =>
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+
+  try {
+    const res = await fetch(`${LOCAL_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!res.ok) {
+      send({ type: "done", text: `Proxy error: local server returned ${res.status}` });
+      controller.close();
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          controller.enqueue(encoder.encode(line + "\n\n"));
+        }
+      }
+    }
+    controller.close();
+  } catch (err) {
+    send({ type: "done", text: `Could not reach local Jarvis server: ${err.message}` });
+    controller.close();
+  }
+}
+
 export async function POST(req) {
   const { message } = await req.json();
   if (!message?.trim()) {
@@ -99,6 +144,13 @@ export async function POST(req) {
       const send = (obj) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
+      // On Vercel or anywhere Claude CLI isn't installed, proxy to the local server
+      if (!HAS_CLI) {
+        send({ type: "thinking" });
+        proxyToLocal(message, controller, encoder);
+        return;
+      }
+
       send({ type: "thinking" });
 
       spawnClaude(
@@ -107,7 +159,6 @@ export async function POST(req) {
         (chunk) => send({ type: "chunk", text: chunk }),
         (code, stdout, stderr) => {
           if (code !== 0 && !stdout.trim()) {
-            // Retry without --continue
             spawnClaude(
               message,
               false,

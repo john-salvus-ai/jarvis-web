@@ -141,8 +141,16 @@ export async function POST(req) {
 
   const stream = new ReadableStream({
     start(controller) {
-      const send = (obj) =>
+      let closed = false;
+      const send = (obj) => {
+        if (closed) return;
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      };
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        controller.close();
+      };
 
       // On Vercel or anywhere Claude CLI isn't installed, proxy to the local server
       if (!HAS_CLI) {
@@ -166,12 +174,12 @@ export async function POST(req) {
               (code2, stdout2, stderr2) => {
                 const text = stdout2.trim() || `Error (code ${code2}): ${stderr2.slice(0, 300)}`;
                 send({ type: "done", text });
-                controller.close();
+                close();
               }
             );
           } else {
             send({ type: "done", text: stdout.trim() || `Error (code ${code})` });
-            controller.close();
+            close();
           }
         }
       );

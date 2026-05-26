@@ -154,74 +154,85 @@
 /* ── MOBILE ─────────────────────────────────────────────── */
 @media (max-width: 700px) {
   .app {
-    padding: 0 10px 8px;
+    padding: 0 8px 6px;
     height: 100dvh;
+    gap: 0;
   }
 
   /* Compact top bar */
-  .topbar { height: 42px; padding: 0 4px; }
-  .topbarLeft, .topbarRight { min-width: auto; gap: 5px; }
-  .topbarCenter { font-size: 13px; letter-spacing: 3px; }
+  .topbar { height: 38px; padding: 0 2px; border-bottom-color: rgba(0,119,170,0.5); }
+  .topbarLeft, .topbarRight { min-width: auto; gap: 4px; }
+  .topbarCenter { font-size: 11px; letter-spacing: 2px; }
+  .topbarCenter img { height: 20px !important; margin-right: 6px !important; }
 
-  /*
-   * Key trick: display:contents makes .mainHud invisible to the flex
-   * layout, so its children (leftPanel, centerHud, rightPanel) become
-   * direct children of .app and we can reorder them freely.
-   */
+  /* display:contents dissolves .mainHud so its children
+     participate directly in .app's flex column */
   .mainHud { display: contents; }
 
-  /* Hide the capabilities / session panel */
+  /* Hide capabilities/session panel */
   .leftPanel { display: none !important; }
 
-  /* Reactor block — sits right below the top bar */
+  /* Reactor — tight, sits just below topbar */
   .centerHud {
     order: 2;
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 6px 0 0;
+    gap: 1px;
+    padding: 4px 0 0;
   }
 
-  /* Responsive reactor: 62% of viewport width, capped at 240px */
+  /* Reactor: 38% of viewport, max 140px */
   .reactorSvg {
-    width: min(62vw, 240px) !important;
-    height: min(62vw, 240px) !important;
+    width: min(38vw, 140px) !important;
+    height: min(38vw, 140px) !important;
   }
 
-  .reactorLabel { font-size: 9px; letter-spacing: 2px; }
-  .heardText { font-size: 10px; max-width: 85vw; }
+  .reactorLabel { font-size: 7px; letter-spacing: 2px; margin-top: 1px; }
+  .heardText { font-size: 9px; max-width: 90vw; min-height: 12px; }
 
-  /* Response scrolls and fills remaining vertical space */
+  /* Response area fills remaining vertical space */
   .responseArea {
     order: 3;
     flex: 1;
     overflow-y: auto;
     min-height: 0;
+    margin: 5px 0;
+    padding: 8px 10px;
   }
-  .responseText { font-size: 14px; min-height: 20px; }
+  .responseArea::before { left: 14px; width: 40px; }
+  .responseText { font-size: 13px; min-height: 16px; line-height: 1.45; }
 
-  /* Compact bottom controls strip */
+  /* Bottom controls strip */
   .rightPanel {
     order: 4;
     display: flex !important;
     flex-direction: row !important;
     width: 100%;
-    gap: 8px;
+    gap: 5px;
     flex-shrink: 0;
   }
   .rightPanel .panelBlock {
     flex: 1;
-    padding: 8px 10px;
+    padding: 5px 7px;
+    min-width: 0;
   }
   .rightPanel .panelBlock::before { display: none; }
-  .rightPanel .panelLabel { margin-bottom: 4px; font-size: 7px; }
+  .rightPanel .panelLabel { margin-bottom: 3px; font-size: 6px; letter-spacing: 2px; }
 
-  /* No history on mobile — keep UX clean */
+  /* Hide non-essential in right panel on mobile */
+  .rightPanel .panelValue { display: none; }
+
+  /* No history on mobile */
   .historyArea { display: none; }
 
-  /* Bigger tap targets */
-  .hudBtn { padding: 9px 8px; font-size: 9px; margin-top: 6px; }
-  .modeBtn { padding: 9px 4px; }
+  /* Touch-friendly tap targets */
+  .hudBtn { padding: 8px 6px; font-size: 8px; margin-top: 4px; letter-spacing: 1px; }
+  .modeBtn { padding: 8px 2px; font-size: 7px; letter-spacing: 0px; }
+  .modeRow { gap: 4px; margin-bottom: 4px; }
+  .toggleRow { font-size: 8px; letter-spacing: 1px; }
+  .toggle { width: 30px; height: 15px; }
+  .slider::before { width: 10px; height: 10px; left: 1px; top: 1px; }
+  .toggle input:checked + .slider::before { transform: translateX(15px); }
 }

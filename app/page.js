@@ -51,6 +51,11 @@ export default function JarvisPage() {
   const autoListenRef = useRef(false);
   const conversationModeRef = useRef(false);
   const currentAudioRef = useRef(null);
+  const isIOS = useRef(false);
+
+  useEffect(() => {
+    isIOS.current = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  }, []);
 
   useEffect(() => {
     conversationModeRef.current = conversationMode;
@@ -95,8 +100,9 @@ export default function JarvisPage() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return null;
     const r = new SR();
-    r.continuous = conversationModeRef.current;
-    r.interimResults = true;
+    // iOS Safari doesn't support continuous mode reliably
+    r.continuous = conversationModeRef.current && !isIOS.current;
+    r.interimResults = !isIOS.current; // iOS gives final results only
     r.lang = "en-US";
 
     let accumulated = "";
@@ -138,7 +144,11 @@ export default function JarvisPage() {
       setIsListening(false);
       clearTimeout(silenceTimer);
       accumulated = "";
-      if (e.error !== "no-speech") setHeardText(`Error: ${e.error}`);
+      if (e.error === "not-allowed") {
+        setHeardText("Mic access denied — check browser settings.");
+      } else if (e.error !== "no-speech" && e.error !== "aborted") {
+        setHeardText(`Mic error: ${e.error}`);
+      }
     };
     return r;
   }, []); // eslint-disable-line
@@ -259,9 +269,9 @@ export default function JarvisPage() {
             setResponseText(finalText);
             setHistory(prev => [...prev, { who: "JARVIS", msg: finalText }]);
             if (ttsEnabled) {
-              if (conversationModeRef.current) autoListenRef.current = true;
+              if (conversationModeRef.current && !isIOS.current) autoListenRef.current = true;
               speak(finalText);
-            } else if (conversationModeRef.current) {
+            } else if (conversationModeRef.current && !isIOS.current) {
               setTimeout(() => startListening(), 500);
             }
           }
@@ -355,7 +365,7 @@ export default function JarvisPage() {
 
       <div className={styles.mainHud}>
 
-        <div className={styles.sidePanel}>
+        <div className={`${styles.sidePanel} ${styles.leftPanel}`}>
           <div className={styles.panelBlock}>
             <div className={styles.panelLabel}>CAPABILITIES</div>
             <div className={styles.capList}>
@@ -410,7 +420,7 @@ export default function JarvisPage() {
           <div className={styles.heardText}>{heardText || " "}</div>
         </div>
 
-        <div className={styles.sidePanel}>
+        <div className={`${styles.sidePanel} ${styles.rightPanel}`}>
           <div className={styles.panelBlock}>
             <div className={styles.panelLabel}>INPUT MODE</div>
             <div className={styles.modeRow}>

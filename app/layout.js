@@ -3,6 +3,7 @@ import "./globals.css";
 export const metadata = {
   title: "J.A.R.V.I.S.",
   description: "Just A Rather Very Intelligent System",
+  icons: { icon: "/salvus-logo.png" },
 };
 
 export default function RootLayout({ children }) {

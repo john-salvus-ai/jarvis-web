@@ -343,7 +343,10 @@ export default function JarvisPage() {
           <span className={styles.label}>SYSTEM</span>
           <span className={styles.value} data-state={reactorState}>{status}</span>
         </div>
-        <div className={styles.topbarCenter}>J.A.R.V.I.S.</div>
+        <div className={styles.topbarCenter}>
+          <img src="/salvus-logo.png" alt="Salvus AI" style={{ height: 28, marginRight: 10, verticalAlign: "middle", opacity: 0.9 }} />
+          J.A.R.V.I.S.
+        </div>
         <div className={styles.topbarRight}>
           <span className={styles.label}>TIME</span>
           <span className={styles.value}>{clock}</span>

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { proxyToken, getPassword } from "../../../lib/auth";
 
 const WORK_DIR = process.env.JARVIS_WORK_DIR || "/home/claude/jarvis-workspace";
 const LOCAL_URL = process.env.JARVIS_LOCAL_URL || "http://5.78.220.133:3131";
@@ -9,7 +10,10 @@ export async function POST() {
   if (!HAS_CLI) {
     // On Vercel: proxy reset to local server
     try {
-      await fetch(`${LOCAL_URL}/api/reset`, { method: "POST" });
+      const pw = getPassword();
+      const headers = {};
+      if (pw) headers["x-jarvis-proxy"] = await proxyToken(pw);
+      await fetch(`${LOCAL_URL}/api/reset`, { method: "POST", headers });
     } catch (_) {}
     return Response.json({ ok: true });
   }

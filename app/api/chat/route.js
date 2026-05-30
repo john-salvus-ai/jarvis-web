@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
+import { proxyToken, getPassword } from "../../../lib/auth";
 
 const CLAUDE_BIN = process.env.CLAUDE_BIN || "/usr/bin/claude";
 const MCP_CONFIG = "/home/claude/.config/claude-code/mcp-web.json";
@@ -96,9 +97,13 @@ async function proxyToLocal(message, controller, encoder) {
     controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
   try {
+    const pw = getPassword();
+    const headers = { "Content-Type": "application/json" };
+    if (pw) headers["x-jarvis-proxy"] = await proxyToken(pw);
+
     const res = await fetch(`${LOCAL_URL}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ message }),
     });
 
